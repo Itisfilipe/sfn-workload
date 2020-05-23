@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "ml-scrapper"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-6q7gif57j852"
+s3_prefix = "ml-scrapper"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+

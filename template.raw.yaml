@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Sample AWS Step Function app
+
+Globals:
+
+  Function:
+    Runtime: python3.7
+    Timeout: 30
+    Tags:
+      ProjectName:MercadoLivreSummary
+
+Resources:
+
+  MLBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: "ml-spreadsheets"
+      Tags:
+        - Key: "ProjectName"
+          Value: "MercadoLivreSummary"
+
+  MLBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MLBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Resource:
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref MLBucket
+                  - '/*'
+            Principal: '*'
+        Tags:
+          Project: MercadoLivreSummary
+
+
+  ClientsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: clientId
+        Type: String
+      TableName: "Clients"
+      Tags:
+        ProjectName:MercadoLivreSummary
+
+
+  ReadClientsTableFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies: AmazonDynamoDBFullAccess
+      Description: Retrieve all data from dynamoDB
+      CodeUri: ./src/
+      Handler: read_from_dynamodb.handler
+
+  SaveClientFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies: AmazonDynamoDBFullAccess
+      Description: Called by the webapp to save the user to the database with its keywords
+      CodeUri: ./src/
+      Handler: client_to_dynamo.handler
+
+  MLToSpreadSheetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Policies: AmazonS3FullAccess
+      Description: Gets the client data from event, download data from mercado livre and save it to a downloadble CSV on S3
+      CodeUri: ./src/
+      Handler: ml_to_spreadsheet.handler
+
+
+  SendSpreadSheetToClientEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Gets an event with the email and S3 link and send it to the client using SES
+      CodeUri: ./src/
+      Handler: spreadsheet_to_email.handler
+      Policies:
+        - AmazonSESFullAccess
+
+  MLStateMachine:
+    Type: "AWS::StepFunctions::StateMachine"
+    Properties:
+      RoleArn: !GetAtt StepFunctionsServiceRole.Arn
+      Tags:
+        - Key: "ProjectName"
+          Value: "MercadoLivreSummary"
+      DefinitionString: !Sub |-
+        ##{{STATEMACHINE_DEF}}
+
+  StepFunctionsServiceRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: !Join ["", ["/", !Ref "AWS::StackName", "/"]]
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowStepFunctionsServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - !Sub "states.${AWS::Region}.amazonaws.com"
+      Policies:
+        - PolicyName: "InvokeFunctions"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource:
+                  - !Sub ${ReadClientsTableFunction.Arn}
+                  - !Sub ${MLToSpreadSheetFunction.Arn}
+                  - !Sub ${SendSpreadSheetToClientEmailFunction.Arn}

@@ -1,0 +1,57 @@
+{
+  "Comment": "mercado livre workflow",
+  "StartAt": "ReadClientsTable",
+  "HeartbeatSeconds": 30,
+  "States": {
+    "ReadClientsTable": {
+      "Type": "Task",
+      "Resource": "${ReadClientsTableFunction.Arn}",
+      "ResultPath": "$.List",
+      "Next": "LoopDynamoDb"
+    },
+
+    "LoopDynamoDb": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Not": {
+            "Variable": "$.List[0]",
+            "StringEquals": "DONE"
+          },
+          "Next": "MLToSpreadSheet"
+        }
+      ],
+      "Default": "Succeed"
+    },
+
+    "MLToSpreadSheet": {
+      "Type": "Task",
+      "Resource": "${MLToSpreadSheetFunction.Arn}",
+      "Next": "SendSpreadSheetToClientEmail"
+    },
+
+    "SendSpreadSheetToClientEmail": {
+      "Type": "Task",
+      "Resource": "${SendSpreadSheetToClientEmailFunction.Arn}",
+      "Next": "WaitToNotOverload"
+    },
+
+    "WaitToNotOverload": {
+      "Type": "Wait",
+      "Seconds": "1",
+      "Next": "PopElementFromList"
+    },
+
+    "PopElementFromList": {
+      "Type": "Pass",
+      "Parameters": {
+        "List.$": "$.List[1:]"
+      },
+      "Next": "LoopDynamoDb"
+    },
+
+    "Succeed": {
+      "Type": "Succeed"
+    }
+  }
+}
