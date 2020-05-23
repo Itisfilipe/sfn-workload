@@ -247,3 +247,4 @@ $RECYCLE.BIN/
 template.yaml
 .idea
 .aws-sam
+packaged.yaml

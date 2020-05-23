@@ -7,24 +7,53 @@ Globals:
   Function:
     Runtime: python3.7
     Timeout: 30
-    Tags:
-      ProjectName:MercadoLivreSummary
+
+Parameters:
+  ShouldCreateTable:
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: false
+  ShouldCreateBucket:
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    Default: false
+  ReportsBucketName:
+    Type: String
+    Default: "reports-spreadsheets"
+  ClientId:
+    Type: String
+    Default: "ADD THE APP CLIENT ID HERE"
+  ClientSecret:
+    Type: String
+    Default: "ADD THE APP CLIENT SECRET HERE"
+  DynamodDBTable:
+    Type: String
+    Default: "emails"
+
+Conditions:
+  CreateTable: !Equals [ !Ref ShouldCreateTable, true ]
+  CreateBucket: !Equals [ !Ref ShouldCreateBucket, true ]
 
 Resources:
 
-  MLBucket:
+  ReportsBucket:
     Type: AWS::S3::Bucket
+    Condition: CreateBucket
     DeletionPolicy: Retain
     Properties:
-      BucketName: "ml-spreadsheets"
-      Tags:
-        - Key: "ProjectName"
-          Value: "MercadoLivreSummary"
+      BucketName: !Ref ReportsBucketName
 
-  MLBucketPolicy:
+  ReportsBucketPolicy:
+    DependsOn: ReportsBucket
     Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain
+    Condition: CreateBucket
     Properties:
-      Bucket: !Ref MLBucket
+      Bucket: !Ref ReportsBucket
       PolicyDocument:
         Statement:
           - Action:
@@ -34,65 +63,120 @@ Resources:
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref MLBucket
+                  - !Ref ReportsBucket
                   - '/*'
             Principal: '*'
-        Tags:
-          Project: MercadoLivreSummary
 
-
-  ClientsTable:
-    Type: AWS::Serverless::SimpleTable
+  EmailsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    Condition: CreateTable
     Properties:
-      PrimaryKey:
-        Name: clientId
-        Type: String
-      TableName: "Clients"
-      Tags:
-        ProjectName:MercadoLivreSummary
+      TableName: !Ref DynamodDBTable
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: data
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi_1
+          KeySchema:
+            - AttributeName: sk
+              KeyType: HASH
+            - AttributeName: data
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
 
+  InvokeStepFunctionsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "InvokeStepFunctionsRule"
+      ScheduleExpression: "cron(0 6 * * ? *)" # everyday, 6 AM UTC
+      State: "ENABLED"
+      Targets:
+        - Arn: !Ref MyStepFunctions
+          Id: "MyStepFunctions"
+          RoleArn: !Sub ${InvokeStepFunctionsServiceRole.Arn}
 
-  ReadClientsTableFunction:
+  InvokeStepFunctionsServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: "AllowEventsToInvokeStepFunctionsToAssumeRole"
+            Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service: events.amazonaws.com
+      Policies:
+        - PolicyName: "EventsToInvokeStepFunctionsPolicy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
+                Resource: !Ref MyStepFunctions
+
+  ReadEmailsTableFunction:
     Type: AWS::Serverless::Function
     Properties:
       Policies: AmazonDynamoDBFullAccess
       Description: Retrieve all data from dynamoDB
-      CodeUri: ./src/
-      Handler: read_from_dynamodb.handler
+      CodeUri: ./src/lambda/read_from_dynamodb/
+      Handler: lambda.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DynamodDBTable
 
-  SaveClientFunction:
+  DataToSheetFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Policies: AmazonDynamoDBFullAccess
-      Description: Called by the webapp to save the user to the database with its keywords
-      CodeUri: ./src/
-      Handler: client_to_dynamo.handler
-
-  MLToSpreadSheetFunction:
-    Type: AWS::Serverless::Function
-    Properties:
+      MemorySize: 1024
+      Timeout: 900
       Policies: AmazonS3FullAccess
-      Description: Gets the client data from event, download data from mercado livre and save it to a downloadble CSV on S3
-      CodeUri: ./src/
-      Handler: ml_to_spreadsheet.handler
+      Description: Download data and save it to a CSV on S3
+      CodeUri: ./src/lambda/data_to_spreadsheet/
+      Handler: lambda.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref ReportsBucketName
+          CLIENT_ID: !Ref ClientId
+          CLIENT_SECRET: !Ref ClientSecret
 
 
   SendSpreadSheetToClientEmailFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: Gets an event with the email and S3 link and send it to the client using SES
-      CodeUri: ./src/
-      Handler: spreadsheet_to_email.handler
+      Description: Gets an event with the email and S3 link and send it to the email provided using SES
+      CodeUri: ./src/lambda/spreadsheet_to_email/
+      Handler: lambda.handler
       Policies:
         - AmazonSESFullAccess
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref ReportsBucketName
 
-  MLStateMachine:
+  MyStepFunctions:
     Type: "AWS::StepFunctions::StateMachine"
     Properties:
       RoleArn: !GetAtt StepFunctionsServiceRole.Arn
-      Tags:
-        - Key: "ProjectName"
-          Value: "MercadoLivreSummary"
       DefinitionString: !Sub |-
         ##{{STATEMACHINE_DEF}}
 
@@ -121,6 +205,6 @@ Resources:
                 Action:
                   - "lambda:InvokeFunction"
                 Resource:
-                  - !Sub ${ReadClientsTableFunction.Arn}
+                  - !Sub ${ReadEmailsTableFunction.Arn}
                   - !Sub ${MLToSpreadSheetFunction.Arn}
                   - !Sub ${SendSpreadSheetToClientEmailFunction.Arn}
