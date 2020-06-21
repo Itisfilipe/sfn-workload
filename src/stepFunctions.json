@@ -25,12 +25,12 @@
     "DataToSpreadSheet": {
       "Type": "Task",
       "Resource": "${DataToSheetFunction.Arn}",
-      "Next": "SendSpreadSheetToClientEmail"
+      "Next": "SendSpreadSheetToEmail"
     },
 
-    "SendSpreadSheetToClientEmail": {
+    "SendSpreadSheetToEmail": {
       "Type": "Task",
-      "Resource": "${SendSpreadSheetToClientEmailFunction.Arn}",
+      "Resource": "${SendSpreadSheetToEmailFunction.Arn}",
       "Next": "WaitToNotOverload"
     },
 
@@ -43,7 +43,7 @@
     "PopElementFromList": {
       "Type": "Pass",
       "Parameters": {
-        "ClientData.$": "$.EmailData[1:]"
+        "EmailData.$": "$.EmailData[1:]"
       },
       "Next": "LoopDynamoDb"
     },

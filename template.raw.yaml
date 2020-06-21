@@ -161,7 +161,7 @@ Resources:
           CLIENT_SECRET: !Ref ClientSecret
 
 
-  SendSpreadSheetToClientEmailFunction:
+  SendSpreadSheetToEmailFunction:
     Type: AWS::Serverless::Function
     Properties:
       Description: Gets an event with the email and S3 link and send it to the email provided using SES
@@ -207,4 +207,4 @@ Resources:
                 Resource:
                   - !Sub ${ReadEmailsTableFunction.Arn}
                   - !Sub ${MLToSpreadSheetFunction.Arn}
-                  - !Sub ${SendSpreadSheetToClientEmailFunction.Arn}
+                  - !Sub ${SendSpreadSheetToEmailFunction.Arn}
