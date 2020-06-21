@@ -11,4 +11,5 @@ to figure out that
 - src/lambda/*: contains all lambdas the stepfunctions will be executing
 
 
+This is what you should get (sorry but labels on this image are deprecated  🤷🏻‍♂️)
 ![image](https://user-images.githubusercontent.com/4977614/85228514-2ab4c380-b3ba-11ea-927a-2afd8ffa98a8.png)
