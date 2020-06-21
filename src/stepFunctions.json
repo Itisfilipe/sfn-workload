@@ -2,7 +2,7 @@
   "Comment": "my workflow",
   "StartAt": "ReadEmailsTable",
   "States": {
-    "ReadClientsTable": {
+    "ReadEmailTable": {
       "Type": "Task",
       "Resource": "${ReadEmailsTableFunction.Arn}",
       "Next": "LoopDynamoDb"
