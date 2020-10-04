@@ -1,11 +1,12 @@
-# Step Functions Workload 
-A small aws workload that will grab data from an API, parse it to excel spreadsheets  and deliver to emails.
-It was made for personal usage so it lacks testing and needs some refactoring
+# Step Functions Workload
+A AWS workload that is triggered by a CloudWatch time based event and executes the following actions:
+1. Crawl products from a auction website
+2. Parse and save the data into a S3 bucket
+3. Send the downloadable link to an e-mail
 
 ⚠️ **USE AT YOUR OWN RISK** ⚠️
 
-Also, some configuration is required, check the parameters on cloudformation template and the lambda code
-to figure out that 
+## Technical Details
 
 - **deploy.sh**: execute everything needed for deployment
 - **template.raw.yaml**: cloudformation description of the infrastructure, needs to be parsed with SAM
@@ -13,5 +14,10 @@ to figure out that
 - **src/lambda/***: contains all lambdas the stepfunctions will be executing
 - **AWS Products**: Step Functions, Lambda, S3, DynamoDB, CloudWatch Events and SES
 
-This is what you should get (but labels on this image are deprecated, no time to fix  🤷🏻‍♂️)
-![image](https://user-images.githubusercontent.com/4977614/85228514-2ab4c380-b3ba-11ea-927a-2afd8ffa98a8.png)
+
+## Workload Diagram
+![image](./workload-diagram.png)
+
+
+## State Machine
+![image](./state-machine.png)

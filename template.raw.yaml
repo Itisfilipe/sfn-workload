@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Sample AWS Step Function app
+Description: AWS SFN app that crawls some site and send all data formatted as csv to a list of emails
 
 Globals:
 
@@ -30,7 +30,7 @@ Parameters:
   ClientSecret:
     Type: String
     Default: "ADD THE APP CLIENT SECRET HERE"
-  DynamodDBTable:
+  DynamoDBTable:
     Type: String
     Default: "emails"
 
@@ -72,34 +72,17 @@ Resources:
     DeletionPolicy: Retain
     Condition: CreateTable
     Properties:
-      TableName: !Ref DynamodDBTable
+      TableName: !Ref DynamoDBTable
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
       AttributeDefinitions:
-        - AttributeName: pk
-          AttributeType: S
-        - AttributeName: sk
-          AttributeType: S
-        - AttributeName: data
+        - AttributeName: Email
           AttributeType: S
       KeySchema:
-        - AttributeName: pk
+        - AttributeName: Email
           KeyType: HASH
-        - AttributeName: sk
-          KeyType: RANGE
-      GlobalSecondaryIndexes:
-        - IndexName: gsi_1
-          KeySchema:
-            - AttributeName: sk
-              KeyType: HASH
-            - AttributeName: data
-              KeyType: RANGE
-          Projection:
-            ProjectionType: ALL
-          ProvisionedThroughput:
-            ReadCapacityUnits: 5
-            WriteCapacityUnits: 5
+
 
   InvokeStepFunctionsRule:
     Type: AWS::Events::Rule
@@ -143,7 +126,7 @@ Resources:
       Handler: lambda.handler
       Environment:
         Variables:
-          TABLE_NAME: !Ref DynamodDBTable
+          TABLE_NAME: !Ref DynamoDBTable
 
   DataToSheetFunction:
     Type: AWS::Serverless::Function
@@ -206,5 +189,5 @@ Resources:
                   - "lambda:InvokeFunction"
                 Resource:
                   - !Sub ${ReadEmailsTableFunction.Arn}
-                  - !Sub ${MLToSpreadSheetFunction.Arn}
+                  - !Sub ${DataToSheetFunction.Arn}
                   - !Sub ${SendSpreadSheetToEmailFunction.Arn}

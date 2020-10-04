@@ -1,8 +1,8 @@
 {
-  "Comment": "my workflow",
+  "Comment": "Workflow to send data to email lists",
   "StartAt": "ReadEmailsTable",
   "States": {
-    "ReadEmailTable": {
+    "ReadEmailsTable": {
       "Type": "Task",
       "Resource": "${ReadEmailsTableFunction.Arn}",
       "Next": "LoopDynamoDb"
@@ -13,7 +13,7 @@
       "Choices": [
         {
           "Not": {
-            "Variable": "$.EmailData[0]",
+            "Variable": "$.ClientData[0]",
             "StringEquals": "DONE"
           },
           "Next": "DataToSpreadSheet"
@@ -43,7 +43,7 @@
     "PopElementFromList": {
       "Type": "Pass",
       "Parameters": {
-        "EmailData.$": "$.EmailData[1:]"
+        "ClientData.$": "$.ClientData[1:]"
       },
       "Next": "LoopDynamoDb"
     },

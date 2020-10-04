@@ -248,3 +248,5 @@ template.yaml
 .idea
 .aws-sam
 packaged.yaml
+
+.vscode/
